@@ -29,6 +29,14 @@ def main():
         if elem.get("fill") in ("#ff0000", "red"):
             root.remove(elem)
 
+    # --- Remove any <text> element that contains the placeholder number ---
+    for elem in root.findall(".//svg:text", namespaces=ns):
+        full_text = ''.join(elem.itertext()).strip()
+        if NUMBER in full_text:
+            root.remove(elem)
+
+
+
     # Insert QR Code
     qr_svg = ET.fromstring(generate_qr_svg_data(URL))
 
