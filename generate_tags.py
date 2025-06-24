@@ -6,64 +6,69 @@ TEMPLATE_PATH = 'Master Template SVG.svg'
 OUTPUT_DIR = 'outputs'
 NUMBER = '0058384'
 URL = f'https://app.netzero.sa/tag/{NUMBER}'
-QR_SIZE_PX = 43.8  # width and height
+QR_SIZE_PX = 43.8  # Target size
 
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-def generate_qr_svg_data(url):
+# --- Function to generate a red QR path ---
+def generate_qr_path_element(url: str, fill_color: str = 'red'):
     qr = segno.make(url)
     buffer = io.BytesIO()
-    qr.save(buffer, kind='svg', xmldecl=False)  # <--- This disables the XML declaration
+    qr.save(buffer, kind='svg', xmldecl=False, scale=1, omitsize=True)
     buffer.seek(0)
-    return buffer.read().decode('utf-8')
+    svg_string = buffer.read().decode('utf-8')
+    root = ET.fromstring(svg_string)
 
+    for elem in root.iter():
+        if elem.tag.endswith('path'):
+            elem.set('fill', fill_color)
+            return elem
+    return None
 
-def main():
-    # Load SVG template
-    tree = ET.parse(TEMPLATE_PATH)
+# --- Function to create the number text element ---
+def generate_number_text_element(number: str, x: float, y: float, font_size: int = 10, fill_color: str = 'red'):
+    text = ET.Element('{http://www.w3.org/2000/svg}text', {
+        'x': str(x),
+        'y': str(y),
+        'font-family': 'Myriad Pro',
+        'font-size': str(font_size),
+        'text-anchor': 'middle',
+        'fill': fill_color
+    })
+    text.text = number
+    return text
+
+# --- Function to create a complete tag from template ---
+def create_tag_svg(template_path, output_path, number, qr_url):
+    tree = ET.parse(template_path)
     root = tree.getroot()
     ns = {'svg': 'http://www.w3.org/2000/svg'}
 
-    # Remove red box (identified by color or ID)
+    # Remove red square
     for elem in root.findall(".//svg:rect", namespaces=ns):
         if elem.get("fill") in ("#ff0000", "red"):
             root.remove(elem)
 
-    # --- Remove any <text> element that contains the placeholder number ---
+    # Remove existing number text
     for elem in root.findall(".//svg:text", namespaces=ns):
-        full_text = ''.join(elem.itertext()).strip()
-        if NUMBER in full_text:
+        if number in ''.join(elem.itertext()).strip():
             root.remove(elem)
 
+    # --- Insert QR code ---
+    qr_path = generate_qr_path_element(qr_url)
+    if qr_path is not None:
+        qr_path.set("transform", "translate(187.5, 234.5) scale(1.1838)")
+        root.insert(0, qr_path)
 
+    # --- Insert number ---
+    number_text = generate_number_text_element(number, x=209.4, y=230)
+    root.insert(0, number_text)
 
-    # Insert QR Code
-    qr_svg = ET.fromstring(generate_qr_svg_data(URL))
-
-    # Create a group to hold the QR code
-    g = ET.Element('{http://www.w3.org/2000/svg}g')
-    g.append(qr_svg)
-
-    # Move the QR code group to correct position
-    g.set("transform", "translate(100, 100) scale(0.2)")  # TEMPORARY placeholder
-    root.append(g)
-
-    # Add the number as text
-    text = ET.Element('{http://www.w3.org/2000/svg}text', {
-        'x': '100',  # TEMPORARY position
-        'y': '95',
-        'font-family': 'Myriad Pro',
-        'font-size': '10',
-        'text-anchor': 'middle',
-        'fill': 'black'
-    })
-    text.text = NUMBER
-    root.append(text)
-
-    # Save output
-    output_path = os.path.join(OUTPUT_DIR, f'tag_{NUMBER}.svg')
+    # --- Save ---
     tree.write(output_path, pretty_print=True, xml_declaration=True, encoding='utf-8')
-    print(f"Saved {output_path}")
+    print(f"✅ Saved {output_path}")
 
+# --- Run a single test ---
 if __name__ == '__main__':
-    main()
+    output_path = os.path.join(OUTPUT_DIR, f'tag_{NUMBER}.svg')
+    create_tag_svg(TEMPLATE_PATH, output_path, NUMBER, URL)
