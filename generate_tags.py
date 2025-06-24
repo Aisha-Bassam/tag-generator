@@ -21,20 +21,26 @@ def generate_qr_path_element(url: str, fill_color: str = 'white'):
     for elem in root.iter():
         if ET.QName(elem).localname == 'path':
             elem.set('fill', fill_color)
+            elem.set('stroke', 'white')
+            elem.set('stroke-width', '1')
             return elem
     return None
 
 # --- Generate number text element ---
-def generate_number_text_element(number: str, x: float, y: float, font_size: int = 10, fill_color: str = 'white'):
+def generate_number_text_element(number: str, transform: str, fill_color: str = 'white'):
     text = ET.Element('{http://www.w3.org/2000/svg}text', {
-        'x': str(x),
-        'y': str(y),
+        'transform': transform,
         'font-family': 'Myriad Pro',
-        'font-size': str(font_size),
-        'text-anchor': 'middle',
+        'font-size': '6.5',
+        'text-anchor': 'start',
         'fill': fill_color
     })
-    text.text = number
+    tspan = ET.Element('{http://www.w3.org/2000/svg}tspan', {
+        'x': '0',
+        'y': '0'
+    })
+    tspan.text = number
+    text.append(tspan)
     return text
 
 # --- Create a single tag file ---
@@ -58,39 +64,26 @@ def generate_tag_on_template(template_path, output_path, number, qr_url):
     width = float(placeholder.attrib['width'])
     height = float(placeholder.attrib['height'])
 
-    # Create overlay group
-    overlay = ET.Element('{http://www.w3.org/2000/svg}g', {
-        'id': 'qr-overlay'
-    })
-
-    # Add white background box
-    bg = ET.Element('{http://www.w3.org/2000/svg}rect', {
-        'x': str(x),
-        'y': str(y),
-        'width': str(width),
-        'height': str(height),
-        'fill': 'white'
-    })
-    overlay.append(bg)
-
-    # Add QR code
+    # Generate QR path
     qr_path = generate_qr_path_element(qr_url, fill_color='white')
     if qr_path is not None:
         qr_path.set("transform", f"translate({x},{y}) scale({width / 37})")
-        overlay.append(qr_path)
 
-    # Add number text (centered horizontally, placed above QR code)
-    center_x = x + width / 2
-    text_y = y - 1.5  # Adjust as needed to visually align
-    number_text = generate_number_text_element(number, x=center_x, y=text_y, fill_color='white')
-    overlay.append(number_text)
+        # Insert the QR path in place of the placeholder
+        parent = placeholder.getparent()
+        index = list(parent).index(placeholder)
+        parent.remove(placeholder)
+        parent.insert(index, qr_path)
 
-    # Append overlay to root
-    root.append(overlay)
+    # Add number text matching original style and placement
+    transform = "translate(28.9 111.19)"
+    number_text = generate_number_text_element(number, transform=transform, fill_color='white')
+    root.append(number_text)
 
     # Write output file
     tree.write(output_path, pretty_print=True, xml_declaration=True, encoding='utf-8')
     print(f"✅ Saved tag to {output_path}")
+
 
 if __name__ == '__main__':
     output_path = os.path.join(OUTPUT_DIR, f'tag_{NUMBER}.svg')

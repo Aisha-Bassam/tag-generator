@@ -42,34 +42,6 @@ def copy_visuals(src_elem, dest_elem):
 
 copy_visuals(root, new_svg)
 
-# Find the barcode placeholder <rect> by ID and extract its dimensions
-barcode_box = None
-for elem in root.iter():
-    if elem.tag.endswith('rect') and elem.attrib.get('id') == 'barcode-placeholder':
-        barcode_box = elem
-        break
-
-# If found, insert a white rectangle at the same location
-if barcode_box is not None:
-    bg = ET.Element('{http://www.w3.org/2000/svg}rect', {
-        'x': barcode_box.attrib.get('x', '0'),
-        'y': barcode_box.attrib.get('y', '0'),
-        'width': barcode_box.attrib.get('width', '0'),
-        'height': barcode_box.attrib.get('height', '0'),
-        'fill': 'white'
-    })
-
-    # Try to insert into the same <g> group with 7 children
-    target_group = None
-    for elem in new_svg.iter():
-        if elem.tag.endswith('g') and len(list(elem)) == 7:
-            target_group = elem
-            break
-
-    if target_group is not None:
-        target_group.insert(0, bg)
-    else:
-        new_svg.append(bg)
 
 # Save new SVG
 ET.ElementTree(new_svg).write(output_file, encoding="utf-8", xml_declaration=True)
