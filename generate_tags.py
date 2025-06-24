@@ -11,7 +11,7 @@ QR_SIZE_PX = 43.8
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 # --- Generate <path> from QR ---
-def generate_qr_path_element(url: str, fill_color: str = 'red'):
+def generate_qr_path_element(url: str, fill_color: str = 'white'):
     qr = segno.make(url)
     buffer = io.BytesIO()
     qr.save(buffer, kind='svg', xmldecl=False, scale=1, omitsize=True)
@@ -19,13 +19,13 @@ def generate_qr_path_element(url: str, fill_color: str = 'red'):
     svg_string = buffer.read().decode('utf-8')
     root = ET.fromstring(svg_string)
     for elem in root.iter():
-        if elem.tag.endswith('path'):
+        if ET.QName(elem).localname == 'path':
             elem.set('fill', fill_color)
             return elem
     return None
 
 # --- Generate number text element ---
-def generate_number_text_element(number: str, x: float, y: float, font_size: int = 10, fill_color: str = 'red'):
+def generate_number_text_element(number: str, x: float, y: float, font_size: int = 10, fill_color: str = 'white'):
     text = ET.Element('{http://www.w3.org/2000/svg}text', {
         'x': str(x),
         'y': str(y),
@@ -37,89 +37,61 @@ def generate_number_text_element(number: str, x: float, y: float, font_size: int
     text.text = number
     return text
 
-# --- Prepare modified template with white background ---
-def modify_template(template_path: str, number: str) -> ET.ElementTree:
-    tree = ET.parse(template_path)
-    root = tree.getroot()
-    ns = {'svg': 'http://www.w3.org/2000/svg'}
-
-    # Remove red box
-    for elem in root.findall(".//svg:rect", namespaces=ns):
-        if elem.get("fill") in ("#ff0000", "red"):
-            root.remove(elem)
-
-    # Remove number placeholder
-    for elem in root.findall(".//svg:text", namespaces=ns):
-        if number in ''.join(elem.itertext()).strip():
-            root.remove(elem)
-
-    # Add white background rectangle
-    bg = ET.Element('{http://www.w3.org/2000/svg}rect', {
-        'x': '187.5',
-        'y': '229',   # slightly higher to fully cover
-        'width': '43.8',
-        'height': '55',
-        'fill': 'white'
-    })
-    root.append(bg)
-
-    return tree
-
 # --- Create a single tag file ---
 def generate_tag_on_template(template_path, output_path, number, qr_url):
     tree = ET.parse(template_path)
     root = tree.getroot()
     ns = {'svg': 'http://www.w3.org/2000/svg'}
 
-    # Clean template: remove red placeholder
-    for elem in root.findall(".//svg:rect", namespaces=ns):
-        if elem.get("fill") in ("#ff0000", "red"):
-            root.remove(elem)
+    # Locate the barcode placeholder rect by ID
+    placeholder = None
+    for elem in root.iter():
+        if ET.QName(elem).localname == 'rect' and elem.attrib.get('id') == 'barcode-placeholder':
+            placeholder = elem
+            break
 
-    # Remove number placeholder
-    for elem in root.findall(".//svg:text", namespaces=ns):
-        if number in ''.join(elem.itertext()).strip():
-            root.remove(elem)
+    if placeholder is None:
+        raise ValueError("❌ barcode-placeholder not found in template")
 
-    # Create top-level group that is NOT inside the template's layers
+    x = float(placeholder.attrib['x'])
+    y = float(placeholder.attrib['y'])
+    width = float(placeholder.attrib['width'])
+    height = float(placeholder.attrib['height'])
+
+    # Create overlay group
     overlay = ET.Element('{http://www.w3.org/2000/svg}g', {
-        'id': 'qr-output-layer',
-        'style': 'isolation: isolate;'  # Ensure it's not clipped
+        'id': 'qr-overlay'
     })
 
-    # Add white box
+    # Add white background box
     bg = ET.Element('{http://www.w3.org/2000/svg}rect', {
-        'x': '187.5',
-        'y': '229',
-        'width': '43.8',
-        'height': '55',
+        'x': str(x),
+        'y': str(y),
+        'width': str(width),
+        'height': str(height),
         'fill': 'white'
     })
     overlay.append(bg)
 
-    # Add QR
-    qr_path = generate_qr_path_element(qr_url, fill_color='red')
+    # Add QR code
+    qr_path = generate_qr_path_element(qr_url, fill_color='white')
     if qr_path is not None:
-        qr_path.set("transform", "translate(187.5,234.5) scale(1.1838)")
+        qr_path.set("transform", f"translate({x},{y}) scale({width / 37})")
         overlay.append(qr_path)
 
-    # Add number
-    number_text = generate_number_text_element(number, x=209.4, y=230, fill_color='red')
+    # Add number text (centered horizontally, placed above QR code)
+    center_x = x + width / 2
+    text_y = y - 1.5  # Adjust as needed to visually align
+    number_text = generate_number_text_element(number, x=center_x, y=text_y, fill_color='white')
     overlay.append(number_text)
 
-    # Add overlay last so it sits on top
+    # Append overlay to root
     root.append(overlay)
 
+    # Write output file
     tree.write(output_path, pretty_print=True, xml_declaration=True, encoding='utf-8')
     print(f"✅ Saved tag to {output_path}")
 
-# --- Main controller ---
-# def main():
-    # tree = modify_template(TEMPLATE_PATH, NUMBER)
-    # output_path = os.path.join(OUTPUT_DIR, f'tag_{NUMBER}.svg')
-    # generate_tag_on_template(tree, NUMBER, URL, output_path)
-
 if __name__ == '__main__':
     output_path = os.path.join(OUTPUT_DIR, f'tag_{NUMBER}.svg')
-    generate_tag_on_template('Master Template SVG.svg', output_path, NUMBER, URL)
-
+    generate_tag_on_template(TEMPLATE_PATH, output_path, NUMBER, URL)
