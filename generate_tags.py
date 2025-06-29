@@ -11,20 +11,44 @@ QR_SIZE_PX = 43.8
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 # --- Generate <path> from QR ---
+# def generate_qr_path_element(url: str, fill_color: str = 'white'):
+#     qr = segno.make(url)
+#     buffer = io.BytesIO()
+
+#     qr.save(buffer, kind='svg', xmldecl=False, scale=10, omitsize=True)
+#     buffer.seek(0)
+#     svg_string = buffer.read().decode('utf-8')
+#     root = ET.fromstring(svg_string)
+    
+#     for elem in root.iter():
+#         if ET.QName(elem).localname == 'path':
+#             elem.set('fill', fill_color)
+#             # elem.set('stroke', 'red')
+#             # elem.set('stroke-width', '0.1')
+#             return elem
+#     return None
+
 def generate_qr_path_element(url: str, fill_color: str = 'white'):
     qr = segno.make(url)
     buffer = io.BytesIO()
-    qr.save(buffer, kind='svg', xmldecl=False, scale=1, omitsize=True)
+
+    qr.save(buffer, kind='svg', xmldecl=False, scale=10, omitsize=True)
     buffer.seek(0)
     svg_string = buffer.read().decode('utf-8')
     root = ET.fromstring(svg_string)
+
+    # Create a group element to hold all QR paths
+    group = ET.Element('{http://www.w3.org/2000/svg}g')
+
+    # Collect and insert all path elements
     for elem in root.iter():
         if ET.QName(elem).localname == 'path':
             elem.set('fill', fill_color)
-            elem.set('stroke', 'white')
-            elem.set('stroke-width', '1')
-            return elem
-    return None
+            elem.set('stroke', 'red')
+            elem.set('stroke-width', '0.1')
+            group.append(elem)
+
+    return group
 
 # --- Generate number text element ---
 def generate_number_text_element(number: str, transform: str, fill_color: str = 'white'):
@@ -64,10 +88,13 @@ def generate_tag_on_template(template_path, output_path, number, qr_url):
     width = float(placeholder.attrib['width'])
     height = float(placeholder.attrib['height'])
 
+
+
     # Generate QR path
     qr_path = generate_qr_path_element(qr_url, fill_color='white')
     if qr_path is not None:
-        qr_path.set("transform", f"translate({x},{y}) scale({width / 37})")
+        scale_factor = width / (37 * 10)
+        qr_path.set("transform", f"translate({x},{y}) scale({scale_factor})")
 
         # Insert the QR path in place of the placeholder
         parent = placeholder.getparent()
