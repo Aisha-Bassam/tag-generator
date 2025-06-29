@@ -1,10 +1,18 @@
 import lxml.etree as ET
 import os, io
 from qrcodegen import QrCode
+import zipfile
+from tqdm import tqdm  # Optional: for a progress bar
+
+START = 58384
+# END = 114383
+END = 58484
+# BATCH_SIZE = 1000
+BATCH_SIZE = 10
 
 TEMPLATE_PATH = 'Rebuilt Base Template.svg'
 OUTPUT_DIR = 'outputs'
-NUMBER = '0058385'
+NUMBER = '0058384'
 URL = f'https://app.netzero.sa/tag/{NUMBER}'
 QR_SIZE_PX = 43.8
 
@@ -92,6 +100,36 @@ def generate_tag_on_template(template_path, output_path, number, qr_url):
     tree.write(output_path, pretty_print=True, xml_declaration=True, encoding='utf-8')
     print(f"✅ Saved tag to {output_path}")
 
+def pad_number(num):
+    return str(num).zfill(7)
+
+def generate_batch_zip(start, end):
+    batch_folder = os.path.join(OUTPUT_DIR, f"temp_{start}-{end}")
+    os.makedirs(batch_folder, exist_ok=True)
+
+    for n in tqdm(range(start, end + 1), desc=f"Generating {start}-{end}"):
+        num_str = pad_number(n)
+        url = f"https://app.netzero.sa/tag/{num_str}"
+        output_path = os.path.join(batch_folder, f'tag_{num_str}.svg')
+        generate_tag_on_template(TEMPLATE_PATH, output_path, num_str, url)
+
+    zip_name = os.path.join(OUTPUT_DIR, f"{pad_number(start)}-{pad_number(end)}.zip")
+    with zipfile.ZipFile(zip_name, 'w', zipfile.ZIP_DEFLATED) as zipf:
+        for file in os.listdir(batch_folder):
+            zipf.write(os.path.join(batch_folder, file), file)
+    print(f"📦 Created ZIP: {zip_name}")
+
+    # Clean up
+    for f in os.listdir(batch_folder):
+        os.remove(os.path.join(batch_folder, f))
+    os.rmdir(batch_folder)
+
+# if __name__ == '__main__':
+#     output_path = os.path.join(OUTPUT_DIR, f'tag_{NUMBER}.svg')
+#     generate_tag_on_template(TEMPLATE_PATH, output_path, NUMBER, URL)
+
 if __name__ == '__main__':
-    output_path = os.path.join(OUTPUT_DIR, f'tag_{NUMBER}.svg')
-    generate_tag_on_template(TEMPLATE_PATH, output_path, NUMBER, URL)
+    os.makedirs(OUTPUT_DIR, exist_ok=True)
+    for batch_start in range(START, END + 1, BATCH_SIZE):
+        batch_end = min(batch_start + BATCH_SIZE - 1, END)
+        generate_batch_zip(batch_start, batch_end)
