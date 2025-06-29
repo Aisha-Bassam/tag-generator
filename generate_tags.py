@@ -32,9 +32,26 @@ def generate_qr_path_element(url: str, fill_color: str = 'white'):
     qr = segno.make(url)
     buffer = io.BytesIO()
 
-    qr.save(buffer, kind='svg', xmldecl=False, scale=10, omitsize=True)
+    # qr.save(buffer, kind='svg', xmldecl=False, scale=10, omitsize=True)
+    qr.save(
+        buffer,
+        kind='svg',
+        xmldecl=False,
+        scale=10,
+        omitsize=True,
+        svgclass=None,    # Remove global class
+        lineclass=None    # Remove per-line classes
+    )
     buffer.seek(0)
     svg_string = buffer.read().decode('utf-8')
+
+    # Inject 'shape-rendering="crispEdges"' into <svg> tag
+    # This ensures Illustrator renders modules without anti-aliasing
+    svg_string = svg_string.replace(
+        '<svg ',
+        '<svg shape-rendering="crispEdges" '
+    )
+
     root = ET.fromstring(svg_string)
 
     # Create a group element to hold all QR paths
@@ -44,8 +61,8 @@ def generate_qr_path_element(url: str, fill_color: str = 'white'):
     for elem in root.iter():
         if ET.QName(elem).localname == 'path':
             elem.set('fill', fill_color)
-            elem.set('stroke', 'red')
-            elem.set('stroke-width', '0.1')
+            # elem.set('stroke', 'red')
+            # elem.set('stroke-width', '0.1')
             group.append(elem)
 
     return group
