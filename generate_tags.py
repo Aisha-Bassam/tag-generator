@@ -77,6 +77,8 @@ def generate_tag_on_template(template_path, output_path, number, qr_url):
     y = float(placeholder.attrib['y'])
     width = float(placeholder.attrib['width'])
     height = float(placeholder.attrib['height'])
+    # width = QR_WIDTH_PX
+    # height = QR_HEIGHT_PX
 
     # Generate QR using qrcodegen
     qr = QrCode.encode_text(qr_url, QrCode.Ecc.MEDIUM)
@@ -125,12 +127,13 @@ def generate_batch_zip(start, end):
         os.remove(os.path.join(batch_folder, f))
     os.rmdir(batch_folder)
 
-# if __name__ == '__main__':
-#     output_path = os.path.join(OUTPUT_DIR, f'tag_{NUMBER}.svg')
-#     generate_tag_on_template(TEMPLATE_PATH, output_path, NUMBER, URL)
-
+# for one file generation
 if __name__ == '__main__':
-    os.makedirs(OUTPUT_DIR, exist_ok=True)
-    for batch_start in range(START, END + 1, BATCH_SIZE):
-        batch_end = min(batch_start + BATCH_SIZE - 1, END)
-        generate_batch_zip(batch_start, batch_end)
+    output_path = os.path.join(OUTPUT_DIR, f'tag_{NUMBER}.svg')
+    generate_tag_on_template(TEMPLATE_PATH, output_path, NUMBER, URL)
+
+# if __name__ == '__main__':
+#     os.makedirs(OUTPUT_DIR, exist_ok=True)
+#     for batch_start in range(START, END + 1, BATCH_SIZE):
+#         batch_end = min(batch_start + BATCH_SIZE - 1, END)
+#         generate_batch_zip(batch_start, batch_end)
