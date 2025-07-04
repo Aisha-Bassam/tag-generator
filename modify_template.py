@@ -12,6 +12,10 @@ ET.register_namespace('', SVG_NS)
 # Parse input SVG
 tree = ET.parse(input_file)
 root = tree.getroot()
+root.attrib['width'] = '7cm'
+root.attrib['height'] = '2.5cm'
+# root.attrib['viewBox'] = '0 0 264.6 94.5'  # 7cm × 2.5cm at 37.8 px/cm
+
 
 # === STEP 1: Remove any <text> that is exactly a 7-digit number ===
 for parent in root.iter():
